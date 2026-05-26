@@ -235,10 +235,39 @@ function loadImage(file) {
 }
 
 function setupDragDrop() {
+  const dz = document.getElementById('dropZone');
   const area = document.getElementById('canvasArea');
-  area.addEventListener('dragover', e => { e.preventDefault(); document.getElementById('dropZone').classList.add('dragover'); });
-  area.addEventListener('dragleave', () => document.getElementById('dropZone').classList.remove('dragover'));
-  area.addEventListener('drop', e => { e.preventDefault(); document.getElementById('dropZone').classList.remove('dragover'); loadImage(e.dataTransfer.files[0]); });
+
+  // Prevent default on both to allow drop
+  ['dragenter','dragover','dragleave','drop'].forEach(evt => {
+    area.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); });
+    dz.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); });
+  });
+
+  dz.addEventListener('dragenter', () => dz.classList.add('dragover'));
+  dz.addEventListener('dragover', () => dz.classList.add('dragover'));
+  dz.addEventListener('dragleave', e => {
+    // Only remove if actually leaving the drop zone
+    if (!dz.contains(e.relatedTarget)) dz.classList.remove('dragover');
+  });
+  dz.addEventListener('drop', e => {
+    dz.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length > 0 && files[0].type.startsWith('image/')) {
+      loadImage(files[0]);
+    }
+  });
+
+  // Also allow drop on canvas area when image is loaded
+  area.addEventListener('drop', e => {
+    const files = e.dataTransfer.files;
+    if (files.length > 0 && files[0].type.startsWith('image/')) {
+      loadImage(files[0]);
+    }
+  });
+
+  // Click on drop zone opens file picker
+  dz.addEventListener('click', () => document.getElementById('fileInput').click());
 }
 
 function resetImage() {
