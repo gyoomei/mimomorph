@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiMoMorph — Photo Glitch & Distortion Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --font:'Outfit',system-ui,sans-serif;--font-display:'Space Grotesk',system-ui,sans-serif;--font-mono:'JetBrains Mono',monospace;
+  --bg:#08090a;--panel:#0f1012;--panel2:#16181c;--panel3:#1c1f24;
+  --text:#f0f0f5;--muted:#7a7a90;--acc:#6366f1;--acc2:#8b5cf6;--acc3:#ec4899;
+  --good:#22c55e;--warn:#f59e0b;--bad:#ef4444;
+  --line:rgba(255,255,255,.06);--line2:rgba(255,255,255,.12);
+  --radius:12px;--radius-sm:8px;--radius-xs:6px;
+}
+[data-theme="light"]{
+  --bg:#f8f7f4;--panel:#ffffff;--panel2:#f2f1ed;--panel3:#e8e7e3;
+  --text:#0a0a14;--muted:#5a5a70;--acc:#4f46e5;--acc2:#7c3aed;--acc3:#db2777;
+  --line:rgba(0,0,0,.08);--line2:rgba(0,0,0,.15);
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px}
+body{display:flex;flex-direction:column}
+button{font-family:var(--font);cursor:pointer;border:none;background:none;color:var(--text);font-size:13px}
+
+/* NAV */
+nav{display:flex;align-items:center;gap:10px;padding:6px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex-shrink:0;z-index:10;flex-wrap:wrap}
+.nav-logo{font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:-.03em;background:linear-gradient(135deg,#ec4899,#8b5cf6,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-sep{width:1px;height:20px;background:var(--line2)}
+.nav-btn{padding:5px 10px;border-radius:var(--radius-xs);background:var(--panel2);border:1px solid var(--line);transition:all .15s;font-size:12px;font-weight:500;white-space:nowrap}
+.nav-btn:hover{border-color:var(--acc);color:var(--acc)}
+.nav-btn.primary{background:var(--acc);color:#fff;border-color:var(--acc)}
+.nav-spacer{flex:1}
+.icon-btn{width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-xs);background:var(--panel2);border:1px solid var(--line);font-size:14px;transition:all .15s}
+.icon-btn:hover{border-color:var(--acc);background:var(--panel3)}
+.theme-toggle::before{content:'🌙'}
+[data-theme="light"] .theme-toggle::before{content:'☀️'}
+
+/* MAIN */
+.main{display:flex;flex:1;overflow:hidden}
+.canvas-area{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;background:var(--bg)}
+.canvas-area.has-image{background:repeating-conic-gradient(var(--panel2) 0% 25%, var(--panel3) 0% 50%) 0 0/20px 20px}
+#previewCanvas{max-width:100%;max-height:100%;object-fit:contain;display:block;image-rendering:auto}
+.drop-zone{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;border:2px dashed var(--line2);margin:20px;border-radius:var(--radius);transition:all .2s}
+.drop-zone.dragover{border-color:var(--acc);background:rgba(99,102,241,.06)}
+.drop-zone.hidden{display:none}
+.drop-icon{font-size:48px;opacity:.5}
+.drop-text{font-size:14px;color:var(--muted);text-align:center}
+.drop-text strong{color:var(--text)}
+
+/* RIGHT PANEL */
+.right-panel{width:280px;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.panel-section{padding:10px;border-bottom:1px solid var(--line)}
+.panel-title{font-family:var(--font-display);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px}
+
+/* EFFECTS GRID */
+.effects-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:4px}
+.effect-btn{padding:6px 4px;border-radius:var(--radius-xs);background:var(--panel2);border:2px solid var(--line);font-size:10px;font-weight:500;text-align:center;transition:all .15s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.effect-btn:hover{border-color:var(--line2)}
+.effect-btn.active{border-color:var(--acc);background:rgba(99,102,241,.08);color:var(--acc)}
+
+/* SLIDER */
+.slider-group{display:flex;flex-direction:column;gap:6px}
+.slider-row{display:flex;align-items:center;gap:6px}
+.slider-row label{font-size:11px;color:var(--muted);min-width:50px}
+.slider-row input[type=range]{flex:1;height:3px}
+.slider-row span{font-family:var(--font-mono);font-size:10px;color:var(--muted);min-width:28px;text-align:right}
+
+/* STACK */
+.effect-stack{display:flex;flex-direction:column;gap:3px;max-height:150px;overflow-y:auto}
+.stack-item{display:flex;align-items:center;gap:4px;padding:4px 6px;background:var(--panel2);border-radius:var(--radius-xs);border:1px solid var(--line);font-size:10px}
+.stack-item .name{flex:1;font-weight:500}
+.stack-item .val{font-family:var(--font-mono);color:var(--muted)}
+.stack-item button{width:18px;height:18px;font-size:10px;border-radius:4px;display:flex;align-items:center;justify-content:center}
+.stack-item button:hover{background:var(--panel3);color:var(--bad)}
+
+/* STATUS */
+.status-bar{display:flex;align-items:center;gap:12px;padding:3px 14px;background:var(--panel);border-top:1px solid var(--line);font-family:var(--font-mono);font-size:10px;color:var(--muted);flex-shrink:0}
+
+/* TOAST */
+.toast{position:fixed;bottom:50px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel3);color:var(--text);padding:8px 16px;border-radius:var(--radius);border:1px solid var(--line2);font-size:12px;z-index:999;opacity:0;transition:all .3s;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media(max-width:700px){
+  .main{flex-direction:column}
+  .right-panel{width:100%;max-height:220px;flex-direction:row;overflow-x:auto;order:2}
+  .panel-section{min-width:200px;border-right:1px solid var(--line);border-bottom:none}
+  .canvas-area{order:1;min-height:250px}
+}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
+</style>
+</head>
+<body>
+<nav>
+  <span class="nav-logo">MiMoMorph</span>
+  <div class="nav-sep"></div>
+  <button class="nav-btn" onclick="document.getElementById('fileInput').click()">📁 Open</button>
+  <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="loadImage(this.files[0])">
+  <button class="nav-btn" onclick="resetImage()">↩️ Reset</button>
+  <button class="nav-btn" onclick="undoStack.length>1&&undo()">↩ Undo</button>
+  <div class="nav-sep"></div>
+  <button class="nav-btn primary" onclick="applyEffect()">⚡ Apply</button>
+  <button class="nav-btn" onclick="applyAll()">🔥 Apply All</button>
+  <span class="nav-spacer"></span>
+  <button class="nav-btn" onclick="exportPNG()">📷 Export</button>
+  <button class="icon-btn theme-toggle" onclick="toggleTheme()"></button>
+</nav>
+
+<div class="main">
+  <div class="canvas-area" id="canvasArea">
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-icon">🖼️</div>
+      <div class="drop-text"><strong>Drop image here</strong><br>or click Open to upload</div>
+    </div>
+    <canvas id="previewCanvas"></canvas>
+  </div>
+
+  <div class="right-panel">
+    <div class="panel-section">
+      <div class="panel-title">Effect</div>
+      <div class="effects-grid" id="effectsGrid"></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">Parameters</div>
+      <div class="slider-group" id="sliderGroup"></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">Applied Stack</div>
+      <div class="effect-stack" id="effectStack"></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">Presets</div>
+      <div class="effects-grid">
+        <button class="effect-btn" onclick="applyPreset('vhs')">📼 VHS</button>
+        <button class="effect-btn" onclick="applyPreset('cyber')">🌆 Cyberpunk</button>
+        <button class="effect-btn" onclick="applyPreset('retro')">📻 Retro</button>
+        <button class="effect-btn" onclick="applyPreset('corrupt')">💀 Corrupt</button>
+        <button class="effect-btn" onclick="applyPreset('dream')">🌸 Dream</button>
+        <button class="effect-btn" onclick="applyPreset('horror')">👻 Horror</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <span id="statusSize">No image</span>
+  <span id="statusEffect">—</span>
+  <span style="flex:1"></span>
+  <span>MiMoMorph v1.0 · Zero API</span>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════
+// EFFECTS DEFINITION
+// ═══════════════════════════════════════
+const EFFECTS = [
+  {id:'rgbShift',      name:'RGB Shift',      params:{offset:{min:0,max:80,value:10}}},
+  {id:'pixelSort',     name:'Pixel Sort',     params:{threshold:{min:0,max:255,value:100},direction:{min:0,max:3,value:0}}},
+  {id:'scanline',      name:'Scanline',       params:{gap:{min:1,max:20,value:4},intensity:{min:0,max:100,value:50}}},
+  {id:'wave',          name:'Wave',           params:{amplitude:{min:0,max:50,value:10},frequency:{min:1,max:50,value:10}}},
+  {id:'glitchBlocks',  name:'Glitch Blocks',  params:{size:{min:5,max:100,value:30},count:{min:1,max:50,value:10}}},
+  {id:'noise',         name:'Noise',          params:{amount:{min:0,max:100,value:30}}},
+  {id:'posterize',     name:'Posterize',      params:{levels:{min:2,max:32,value:4}}},
+  {id:'threshold',     name:'Threshold',      params:{cutoff:{min:0,max:255,value:128}}},
+  {id:'pixelate',      name:'Pixelate',       params:{size:{min:2,max:50,value:8}}},
+  {id:'invert',        name:'Invert',         params:{}},
+  {id:'channelSwap',   name:'Channel Swap',   params:{mode:{min:0,max:5,value:0}}},
+  {id:'vhs',           name:'VHS Distort',    params:{shift:{min:0,max:30,value:8},noise:{min:0,max:100,value:30}}},
+  {id:'kaleidoscope',  name:'Kaleidoscope',   params:{segments:{min:2,max:16,value:6}}},
+  {id:'datamosh',      name:'Datamosh',       params:{blockSize:{min:4,max:64,value:16},intensity:{min:0,max:100,value:40}}},
+  {id:'chromatic',     name:'Chromatic Ab.',   params:{offset:{min:0,max:20,value:5}}},
+  {id:'emboss',        name:'Emboss',         params:{strength:{min:0,max:100,value:50}}},
+];
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+let currentEffect = 'rgbShift';
+let originalImageData = null;
+let currentImageData = null;
+let appliedStack = [];
+let undoStack = [];
+let imageLoaded = false;
+
+const canvas = document.getElementById('previewCanvas');
+const ctx = canvas.getContext('2d');
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+function init() {
+  renderEffectsList();
+  renderSliders();
+  setupDragDrop();
+}
+
+// ═══════════════════════════════════════
+// IMAGE LOADING
+// ═══════════════════════════════════════
+function loadImage(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      // Limit size for performance
+      let w = img.width, h = img.height;
+      const maxDim = 1200;
+      if (w > maxDim || h > maxDim) {
+        const scale = maxDim / Math.max(w, h);
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+      }
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(img, 0, 0, w, h);
+      originalImageData = ctx.getImageData(0, 0, w, h);
+      currentImageData = ctx.getImageData(0, 0, w, h);
+      undoStack = [cloneImageData(originalImageData)];
+      appliedStack = [];
+      imageLoaded = true;
+      document.getElementById('dropZone').classList.add('hidden');
+      document.getElementById('canvasArea').classList.add('has-image');
+      document.getElementById('statusSize').textContent = `${w}×${h}`;
+      renderStack();
+      toast('Image loaded');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function setupDragDrop() {
+  const area = document.getElementById('canvasArea');
+  area.addEventListener('dragover', e => { e.preventDefault(); document.getElementById('dropZone').classList.add('dragover'); });
+  area.addEventListener('dragleave', () => document.getElementById('dropZone').classList.remove('dragover'));
+  area.addEventListener('drop', e => { e.preventDefault(); document.getElementById('dropZone').classList.remove('dragover'); loadImage(e.dataTransfer.files[0]); });
+}
+
+function resetImage() {
+  if (!originalImageData) return;
+  currentImageData = cloneImageData(originalImageData);
+  ctx.putImageData(currentImageData, 0, 0);
+  undoStack = [cloneImageData(originalImageData)];
+  appliedStack = [];
+  renderStack();
+  toast('Reset');
+}
+
+function cloneImageData(id) {
+  const c = new ImageData(new Uint8ClampedArray(id.data), id.width, id.height);
+  return c;
+}
+
+function undo() {
+  if (undoStack.length <= 1) return;
+  undoStack.pop();
+  currentImageData = cloneImageData(undoStack[undoStack.length - 1]);
+  ctx.putImageData(currentImageData, 0, 0);
+  if (appliedStack.length) appliedStack.pop();
+  renderStack();
+  toast('Undo');
+}
+
+// ═══════════════════════════════════════
+// UI
+// ═══════════════════════════════════════
+function renderEffectsList() {
+  document.getElementById('effectsGrid').innerHTML = EFFECTS.map(e =>
+    `<button class="effect-btn${e.id===currentEffect?' active':''}" onclick="selectEffect('${e.id}')" id="ef_${e.id}">${e.name}</button>`
+  ).join('');
+}
+
+function selectEffect(id) {
+  currentEffect = id;
+  document.querySelectorAll('.effect-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('ef_'+id).classList.add('active');
+  renderSliders();
+  document.getElementById('statusEffect').textContent = EFFECTS.find(e=>e.id===id).name;
+}
+
+function renderSliders() {
+  const effect = EFFECTS.find(e => e.id === currentEffect);
+  const group = document.getElementById('sliderGroup');
+  const params = effect.params;
+  if (!Object.keys(params).length) { group.innerHTML = '<div style="font-size:11px;color:var(--muted)">No parameters</div>'; return; }
+  group.innerHTML = Object.entries(params).map(([key, cfg]) =>
+    `<div class="slider-row">
+      <label>${key}</label>
+      <input type="range" id="p_${key}" min="${cfg.min}" max="${cfg.max}" value="${cfg.value}" oninput="updateParam('${key}',this.value)">
+      <span id="pv_${key}">${cfg.value}</span>
+    </div>`
+  ).join('');
+}
+
+function updateParam(key, val) {
+  const effect = EFFECTS.find(e => e.id === currentEffect);
+  effect.params[key].value = +val;
+  document.getElementById('pv_'+key).textContent = val;
+}
+
+function renderStack() {
+  document.getElementById('effectStack').innerHTML = appliedStack.length === 0
+    ? '<div style="font-size:10px;color:var(--muted)">No effects applied</div>'
+    : appliedStack.map((s, i) =>
+      `<div class="stack-item">
+        <span class="name">${s.name}</span>
+        <span class="val">${s.params}</span>
+        <button onclick="removeStack(${i})">✕</button>
+      </div>`
+    ).join('');
+}
+
+// ═══════════════════════════════════════
+// APPLY EFFECTS
+// ═══════════════════════════════════════
+function applyEffect() {
+  if (!imageLoaded) return toast('Load an image first');
+  const effect = EFFECTS.find(e => e.id === currentEffect);
+  const params = {};
+  for (const [k, v] of Object.entries(effect.params)) params[k] = v.value;
+
+  currentImageData = cloneImageData(currentImageData);
+  const d = currentImageData.data;
+  const w = currentImageData.width, h = currentImageData.height;
+
+  runEffect(currentEffect, d, w, h, params);
+
+  ctx.putImageData(currentImageData, 0, 0);
+  undoStack.push(cloneImageData(currentImageData));
+  appliedStack.push({ name: effect.name, params: Object.entries(params).map(([k,v]) => `${k}:${v}`).join(' ') });
+  renderStack();
+  toast(`${effect.name} applied`);
+}
+
+function applyAll() {
+  if (!appliedStack.length) return toast('Stack is empty');
+  // Re-apply all from original
+  currentImageData = cloneImageData(originalImageData);
+  const d = currentImageData.data;
+  const w = currentImageData.width, h = currentImageData.height;
+  for (const s of appliedStack) {
+    const effect = EFFECTS.find(e => e.name === s.name);
+    if (!effect) continue;
+    const params = {};
+    s.params.split(' ').forEach(p => { const [k,v] = p.split(':'); params[k] = +v; });
+    runEffect(effect.id, d, w, h, params);
+  }
+  ctx.putImageData(currentImageData, 0, 0);
+  undoStack.push(cloneImageData(currentImageData));
+  toast('All effects reapplied');
+}
+
+function removeStack(idx) {
+  appliedStack.splice(idx, 1);
+  applyAll();
+}
+
+// ═══════════════════════════════════════
+// EFFECT ENGINE
+// ═══════════════════════════════════════
+function runEffect(id, d, w, h, p) {
+  switch(id) {
+    case 'rgbShift': {
+      const off = p.offset * 4;
+      const orig = new Uint8ClampedArray(d);
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = orig[Math.min(i + off, d.length - 4)] || orig[i]; // R shifted right
+        d[i+2] = orig[Math.max(i - off, 0)] || orig[i+2]; // B shifted left
+      }
+      break;
+    }
+    case 'pixelSort': {
+      const dir = Math.floor(p.direction) % 4;
+      for (let row = 0; row < h; row++) {
+        let start = -1;
+        for (let col = 0; col < w; col++) {
+          const i = (row * w + col) * 4;
+          const bright = (d[i] + d[i+1] + d[i+2]) / 3;
+          if (bright > p.threshold && start === -1) start = col;
+          if ((bright <= p.threshold || col === w - 1) && start !== -1) {
+            // Sort pixels from start to col
+            const pixels = [];
+            for (let x = start; x <= col; x++) {
+              const j = (row * w + x) * 4;
+              pixels.push([d[j], d[j+1], d[j+2], d[j+3]]);
+            }
+            pixels.sort((a, b) => (a[0]+a[1]+a[2]) - (b[0]+b[1]+b[2]));
+            for (let x = start; x <= col; x++) {
+              const j = (row * w + x) * 4;
+              const pi = x - start;
+              d[j] = pixels[pi][0]; d[j+1] = pixels[pi][1]; d[j+2] = pixels[pi][2]; d[j+3] = pixels[pi][3];
+            }
+            start = -1;
+          }
+        }
+      }
+      break;
+    }
+    case 'scanline': {
+      const gap = Math.max(1, Math.floor(p.gap));
+      const intensity = p.intensity / 100;
+      for (let y = 0; y < h; y++) {
+        if (y % gap === 0) {
+          for (let x = 0; x < w; x++) {
+            const i = (y * w + x) * 4;
+            d[i] = Math.round(d[i] * (1 - intensity));
+            d[i+1] = Math.round(d[i+1] * (1 - intensity));
+            d[i+2] = Math.round(d[i+2] * (1 - intensity));
+          }
+        }
+      }
+      break;
+    }
+    case 'wave': {
+      const orig = new Uint8ClampedArray(d);
+      const amp = p.amplitude, freq = p.frequency / 100;
+      for (let y = 0; y < h; y++) {
+        const shift = Math.round(Math.sin(y * freq) * amp);
+        for (let x = 0; x < w; x++) {
+          const srcX = (x + shift + w) % w;
+          const di = (y * w + x) * 4;
+          const si = (y * w + srcX) * 4;
+          d[di] = orig[si]; d[di+1] = orig[si+1]; d[di+2] = orig[si+2]; d[di+3] = orig[si+3];
+        }
+      }
+      break;
+    }
+    case 'glitchBlocks': {
+      const bSize = Math.max(1, Math.floor(p.size));
+      const count = Math.floor(p.count);
+      for (let n = 0; n < count; n++) {
+        const bx = Math.floor(Math.random() * (w - bSize));
+        const by = Math.floor(Math.random() * (h - bSize));
+        const shiftX = Math.floor((Math.random() - 0.5) * bSize * 2);
+        for (let y = by; y < Math.min(by + bSize, h); y++) {
+          for (let x = bx; x < Math.min(bx + bSize, w); x++) {
+            const srcX = (x + shiftX + w) % w;
+            const di = (y * w + x) * 4;
+            const si = (y * w + srcX) * 4;
+            d[di] = d[si]; d[di+1] = d[si+1]; d[di+2] = d[si+2];
+          }
+        }
+      }
+      break;
+    }
+    case 'noise': {
+      const amt = p.amount;
+      for (let i = 0; i < d.length; i += 4) {
+        const n = (Math.random() - 0.5) * amt * 2.55;
+        d[i] = Math.max(0, Math.min(255, d[i] + n));
+        d[i+1] = Math.max(0, Math.min(255, d[i+1] + n));
+        d[i+2] = Math.max(0, Math.min(255, d[i+2] + n));
+      }
+      break;
+    }
+    case 'posterize': {
+      const levels = Math.max(2, Math.floor(p.levels));
+      const step = 255 / (levels - 1);
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = Math.round(Math.round(d[i] / step) * step);
+        d[i+1] = Math.round(Math.round(d[i+1] / step) * step);
+        d[i+2] = Math.round(Math.round(d[i+2] / step) * step);
+      }
+      break;
+    }
+    case 'threshold': {
+      for (let i = 0; i < d.length; i += 4) {
+        const v = (d[i] + d[i+1] + d[i+2]) / 3 > p.cutoff ? 255 : 0;
+        d[i] = d[i+1] = d[i+2] = v;
+      }
+      break;
+    }
+    case 'pixelate': {
+      const sz = Math.max(2, Math.floor(p.size));
+      const orig = new Uint8ClampedArray(d);
+      for (let y = 0; y < h; y += sz) {
+        for (let x = 0; x < w; x += sz) {
+          let r=0,g=0,b=0,cnt=0;
+          for (let dy=0;dy<sz&&y+dy<h;dy++) for (let dx=0;dx<sz&&x+dx<w;dx++) {
+            const i=((y+dy)*w+(x+dx))*4; r+=orig[i]; g+=orig[i+1]; b+=orig[i+2]; cnt++;
+          }
+          r=Math.round(r/cnt); g=Math.round(g/cnt); b=Math.round(b/cnt);
+          for (let dy=0;dy<sz&&y+dy<h;dy++) for (let dx=0;dx<sz&&x+dx<w;dx++) {
+            const i=((y+dy)*w+(x+dx))*4; d[i]=r; d[i+1]=g; d[i+2]=b;
+          }
+        }
+      }
+      break;
+    }
+    case 'invert': {
+      for (let i = 0; i < d.length; i += 4) { d[i]=255-d[i]; d[i+1]=255-d[i+1]; d[i+2]=255-d[i+2]; }
+      break;
+    }
+    case 'channelSwap': {
+      const mode = Math.floor(p.mode) % 6;
+      for (let i = 0; i < d.length; i += 4) {
+        const r=d[i],g=d[i+1],b=d[i+2];
+        if(mode===0){d[i]=g;d[i+1]=b;d[i+2]=r;}      // RGB→GBR
+        else if(mode===1){d[i]=b;d[i+1]=r;d[i+2]=g;}  // RGB→BRG
+        else if(mode===2){d[i]=r;d[i+1]=b;d[i+2]=g;}  // RGB→RBG
+        else if(mode===3){d[i]=g;d[i+1]=r;d[i+2]=b;}  // RGB→GRB
+        else if(mode===4){d[i]=b;d[i+1]=g;d[i+2]=r;}  // RGB→BGR
+        else{d[i]=255-r;d[i+1]=255-g;d[i+2]=255-b;}    // Partial invert
+      }
+      break;
+    }
+    case 'vhs': {
+      const orig = new Uint8ClampedArray(d);
+      const shift = Math.floor(p.shift);
+      const noiseAmt = p.noise;
+      // Horizontal shift per line
+      for (let y = 0; y < h; y++) {
+        const lineShift = Math.round(Math.sin(y * 0.1) * shift) + (Math.random() < 0.05 ? Math.floor(Math.random()*20-10) : 0);
+        for (let x = 0; x < w; x++) {
+          const srcX = (x + lineShift + w) % w;
+          const di = (y * w + x) * 4;
+          const si = (y * w + srcX) * 4;
+          d[di] = orig[si]; d[di+1] = orig[si+1]; d[di+2] = orig[si+2];
+        }
+      }
+      // Noise
+      for (let i = 0; i < d.length; i += 4) {
+        if (Math.random() < 0.01) {
+          const n = Math.random() * noiseAmt * 2.55;
+          d[i] = Math.min(255, d[i] + n); d[i+1] = Math.min(255, d[i+1] + n); d[i+2] = Math.min(255, d[i+2] + n);
+        }
+      }
+      break;
+    }
+    case 'kaleidoscope': {
+      const seg = Math.max(2, Math.floor(p.segments));
+      const orig = new Uint8ClampedArray(d);
+      const cx = w/2, cy = h/2;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          let dx = x - cx, dy = y - cy;
+          let angle = Math.atan2(dy, dx);
+          let dist = Math.sqrt(dx*dx + dy*dy);
+          const segAngle = (2 * Math.PI) / seg;
+          angle = ((angle % segAngle) + segAngle) % segAngle;
+          if (angle > segAngle/2) angle = segAngle - angle;
+          const srcX = Math.round(cx + dist * Math.cos(angle));
+          const srcY = Math.round(cy + dist * Math.sin(angle));
+          const di = (y * w + x) * 4;
+          if (srcX >= 0 && srcX < w && srcY >= 0 && srcY < h) {
+            const si = (srcY * w + srcX) * 4;
+            d[di] = orig[si]; d[di+1] = orig[si+1]; d[di+2] = orig[si+2];
+          }
+        }
+      }
+      break;
+    }
+    case 'datamosh': {
+      const bSize = Math.max(2, Math.floor(p.blockSize));
+      const intensity = p.intensity / 100;
+      const orig = new Uint8ClampedArray(d);
+      for (let y = 0; y < h; y += bSize) {
+        for (let x = 0; x < w; x += bSize) {
+          if (Math.random() < intensity) {
+            const shift = Math.floor((Math.random() - 0.5) * bSize * 3);
+            for (let dy = 0; dy < bSize && y+dy < h; dy++) {
+              for (let dx = 0; dx < bSize && x+dx < w; dx++) {
+                const srcX = (x + dx + shift + w) % w;
+                const di = ((y+dy)*w+(x+dx))*4;
+                const si = ((y+dy)*w+srcX)*4;
+                d[di] = orig[si]; d[di+1] = orig[si+1]; d[di+2] = orig[si+2];
+              }
+            }
+          }
+        }
+      }
+      break;
+    }
+    case 'chromatic': {
+      const off = Math.floor(p.offset);
+      const orig = new Uint8ClampedArray(d);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y*w+x)*4;
+          const rx = Math.min(w-1, x+off);
+          const bx = Math.max(0, x-off);
+          d[i] = orig[(y*w+rx)*4];       // R from right
+          d[i+1] = orig[i+1];             // G stays
+          d[i+2] = orig[(y*w+bx)*4+2];   // B from left
+        }
+      }
+      break;
+    }
+    case 'emboss': {
+      const orig = new Uint8ClampedArray(d);
+      const str = p.strength / 100;
+      for (let y = 1; y < h-1; y++) {
+        for (let x = 1; x < w-1; x++) {
+          const i = (y*w+x)*4;
+          const tl = ((y-1)*w+(x-1))*4;
+          const br = ((y+1)*w+(x+1))*4;
+          for (let c = 0; c < 3; c++) {
+            const v = 128 + (orig[tl+c] - orig[br+c]) * str * 2;
+            d[i+c] = Math.max(0, Math.min(255, v));
+          }
+        }
+      }
+      break;
+    }
+  }
+}
+
+// ═══════════════════════════════════════
+// PRESETS
+// ═══════════════════════════════════════
+function applyPreset(name) {
+  if (!imageLoaded) return toast('Load an image first');
+  const presets = {
+    vhs:      [{id:'scanline',p:{gap:3,intensity:40}},{id:'vhs',p:{shift:12,noise:40}},{id:'noise',p:{amount:10}}],
+    cyber:    [{id:'rgbShift',p:{offset:15}},{id:'scanline',p:{gap:2,intensity:30}},{id:'posterize',p:{levels:8}}],
+    retro:    [{id:'posterize',p:{levels:6}},{id:'noise',p:{amount:15}},{id:'scanline',p:{gap:4,intensity:25}}],
+    corrupt:  [{id:'glitchBlocks',p:{size:40,count:25}},{id:'datamosh',p:{blockSize:16,intensity:50}},{id:'rgbShift',p:{offset:20}}],
+    dream:    [{id:'wave',p:{amplitude:5,frequency:5}},{id:'posterize',p:{levels:10}},{id:'noise',p:{amount:8}}],
+    horror:   [{id:'threshold',p:{cutoff:80}},{id:'noise',p:{amount:20}},{id:'glitchBlocks',p:{size:20,count:15}}],
+  };
+  const preset = presets[name];
+  if (!preset) return;
+  resetImage();
+  for (const step of preset) {
+    const effect = EFFECTS.find(e => e.id === step.id);
+    if (!effect) continue;
+    runEffect(step.id, currentImageData.data, currentImageData.width, currentImageData.height, step.p);
+    appliedStack.push({name: effect.name, params: Object.entries(step.p).map(([k,v])=>`${k}:${v}`).join(' ')});
+  }
+  ctx.putImageData(currentImageData, 0, 0);
+  undoStack.push(cloneImageData(currentImageData));
+  renderStack();
+  toast(`Preset: ${name}`);
+}
+
+// ═══════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════
+function exportPNG() {
+  if (!imageLoaded) return toast('Load an image first');
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = 'mimomorph-export.png';
+  a.click();
+  toast('PNG exported');
+}
+
+// ═══════════════════════════════════════
+// THEME
+// ═══════════════════════════════════════
+function toggleTheme() {
+  const h = document.documentElement;
+  h.dataset.theme = h.dataset.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('mimo-theme', h.dataset.theme);
+}
+const t = localStorage.getItem('mimo-theme');
+if (t) document.documentElement.dataset.theme = t;
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 1500);
+}
+
+init();
+</script>
+</body>
+</html>
